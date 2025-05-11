@@ -1,0 +1,699 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+	<style type="text/css">
+		:root {
+			/* replace 'img_url' with your animated image or regular image link */
+			--url: url("");
+		}
+
+		html,
+		body {
+			background-color: #0f0f0f;
+			width: 100%;
+			height: 100%;
+			margin: 0;
+			padding: 0;
+			overflow: hidden;
+			font-family: Consolas, 'Courier New', monospace;
+			color: #0f0f0f;
+		}
+
+		.margin:first-child {
+			background-image: var(--url);
+			background-size: cover;
+			background-repeat: no-repeat;
+			background-attachment: fixed;
+			background-color: #0f0f0f;
+		}
+
+		.lines-content:nth-of-type(1),
+		.monaco-editor-background:nth-of-type(1) {
+			background-image: var(--url);
+			background-size: cover;
+			background-repeat: no-repeat;
+			background-attachment: fixed;
+			background-color: #0f0f0f;
+		}
+		.tabs-container {
+            background-color: #0f0f0f ;
+            display: flex;
+            height: 35px;
+            overflow-x: auto;
+            border-bottom: 1px solid #333;
+        }
+
+        .tab {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  margin: 4px 4px 4px 0;
+  background-color: #2d2d2d;
+  color: #ccc;
+  border: none;
+  border-radius: 8px;
+  min-width: 100px;
+  max-width: 200px;
+  position: relative;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+  user-select: none;
+  height: 26px;
+  font-size: 13px;
+}
+
+.tab.active {
+  background-color: #1c1c1c;
+  color: #ffffff;
+}
+
+.tab-close {
+  margin-left: 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.tab.new-tab {
+  padding: 0 8px;
+  font-size: 14px;
+  background-color: transparent;
+  color: #aaa;
+  border: none;
+  border-radius: 8px;
+  height: 26px;
+  min-width: 28px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab.new-tab:hover {
+  background-color: #333;
+}
+
+
+	</style>
+	<meta charset="utf-8" />
+	<title></title>
+</head>
+
+<body>
+	<div class="tabs-container" id="tabs-container">
+		<button id="new-tab-btn" class="tab new-tab">+</button>
+	  </div>		
+    <div id="container" style="width:100%;height:calc(100% - 35px);"></div>
+	<script src="vs/loader.js"></script>
+	<script type="text/javascript">
+		require.config({
+			paths: {
+				'vs': 'vs',
+			}
+		});
+
+		// API
+		var GetText;
+		var SetText;
+		var SetTheme;
+		var SetScroll;
+		var ShowErr;
+		var Refresh;
+
+		// Enablers
+		var SwitchMinimap;
+		var SwitchReadonly;
+		var SwitchRenderWhitespace;
+		var SwitchLinks;
+		var SwitchLineHeight;
+		var SwitchFontSize;
+		var SwitchFolding;
+		var SwitchAutoIndent;
+		var SwitchFontFamily;
+		var SwitchFontLigatures;
+		var AddIntellisense;
+
+		// Variables
+		var editor;
+		var Proposals = [];
+
+		require(['vs/editor/editor.main'], function () {
+			function getDependencyProposals() {
+				let newProposals = [];
+				for (let index = 0; index < Proposals.length; index++) {
+					const element = Proposals[index];
+					let newElement = {}
+					for (const key in element) {
+						if (key == "__children__") {
+							continue;
+						};
+						newElement[key] = element[key];
+					}
+					newProposals.push(newElement)
+				}
+				return newProposals;
+			}
+
+			monaco.editor.defineTheme('net-theme-light', {
+				base: 'vs',
+				inherit: true,
+				rules: [
+					{ token: 'global', foreground: '000000' },
+					{ token: 'keyword', foreground: '569CD6' },
+					{ token: 'comment', foreground: '6A9955' },
+					{ token: 'number', foreground: 'B5CEA8' },
+					{ token: 'string', foreground: 'ff8c3a' },
+				]
+			});
+
+			monaco.editor.defineTheme('net-theme-dark', {
+				base: 'vs-dark',
+				inherit: true,
+				rules: [
+					{ token: 'global', foreground: 'FFFFFF', fontStyle: "bold" },
+					{ token: 'keyword', foreground: '569CD6', fontStyle: "bold" },
+					{ token: 'comment', foreground: '6A9955' },
+					{ token: 'number', foreground: 'B5CEA8' },
+					{ token: 'string', foreground: 'CE9178' },
+				]
+			});
+
+			monaco.editor.defineTheme('Zorara', {
+				base: 'vs-dark',
+				inherit: true,
+				rules: [
+					{ token: '', foreground: '#ffffff' },
+					{ token: 'variable.language.self', foreground: '#688df2' },
+					{ token: 'variable.parameter.variadic', foreground: '#688df2' },
+					{ token: 'variable.parameter.function', foreground: '#688df2' },
+					{ token: 'variable.other.constant', foreground: '#688df2' },
+					{ token: 'variable.property', foreground: '#688df2' },
+					{ token: 'variable.object.property', foreground: '#688df2' },
+
+					{ token: 'keyword', foreground: '#5b84b0' },
+					{ token: 'keyword.local', foreground: '#5b84b0', fontStyle: 'bold' },
+					{ token: 'keyword.operator', foreground: '#92b1f0' },
+					{ token: 'keyword.operator.type.annotation', foreground: '#5b84b0' },
+					{ token: 'keyword.operator.typedef.annotation', foreground: '#5b84b0' },
+					{ token: 'keyword.control.export', foreground: '#5b84b0', fontStyle: 'italic' },
+
+					{ token: 'operator', foreground: '#688df2' },
+					{ token: 'operator.type', foreground: '#688df2' },
+					{ token: 'operator.special', foreground: '#688df2' },
+
+					{ token: 'entity.name.type.alias', foreground: '#4e75c9' },
+					{ token: 'entity.name.function', foreground: '#99aee8', fontStyle: 'bold' },
+
+					{ token: 'global', foreground: '#688df2' },
+
+					{ token: 'storage.type', foreground: '#688df2' },
+
+					{ token: 'comment', foreground: '#8fc1eb' },
+					{ token: 'comment.highlight.title', foreground: '#8fc1eb', fontStyle: 'italic' },
+					{ token: 'comment.highlight.name', foreground: '#8fc1eb', fontStyle: 'italic' },
+					{ token: 'comment.delimiter.modifier', foreground: '#8fc1eb', fontStyle: 'italic' },
+					{ token: 'comment.highlight.modifier', foreground: '#8fc1eb', fontStyle: 'italic' },
+					{ token: 'comment.highlight.descriptor', foreground: '#8fc1eb', fontStyle: 'italic' },
+
+					{ token: 'delimiter.longstring', foreground: '#a5c0fa' },
+					{ token: 'delimiter.bracket', foreground: '#9cc2ff' },
+					{ token: 'delimiter.array', foreground: '#9cc2ff' },
+					{ token: 'delimiter.parenthesis', foreground: '#9cc2ff' },
+					{ token: 'delimiter', foreground: '#66b2e8' },
+
+					{ token: 'string', foreground: '#93b4fa' },
+					{ token: 'longstring', foreground: '#93b4fa' },
+					{ token: 'string.delimeter', foreground: '#93b4fa' },
+					{ token: 'string.escape', foreground: '#93b4fa' },
+
+					{ token: 'punctuation.separator.arguments', foreground: '#93b4fa' },
+					{ token: 'punctuation.separator.parameter', foreground: '#93b4fa' },
+					{ token: 'punctuation.separator.table', foreground: '#93b4fa' },
+					{ token: 'punctuation.definition.block', foreground: '#93b4fa' },
+					{ token: 'punctuation.definition.parameters', foreground: '#93b4fa' },
+					{ token: 'punctuation.definition.typeparameters', foreground: '#93b4fa' },
+
+					{ token: 'constant.language', foreground: '#5778de' },
+					{ token: 'number', foreground: '#87cfff' },
+					{ token: 'constants', foreground: '#5778de', fontStyle: 'bold' },
+
+					{ token: 'support.function', foreground: '#5278f2', fontStyle: 'bold' },
+					{ token: 'support.function.library', foreground: '#5278f2' },
+					{ token: 'support.type', foreground: '#5278f2' },
+				],
+				colors: {
+					'editor.background': '#0f0f0f',
+					'editorLineNumber.foreground': '#7A7A7A',
+					'editorLineNumber.activeForeground': '#BBBBBB',
+					'editorIndentGuide.background': '#0f0f0f',
+					'editorSuggestWidget.background': "#0f0f0f",
+					'editorSuggestWidget.border': "#000000",
+					'editorSuggestWidget.foreground': "#D5D5D5",
+					'editorSuggestWidget.selectedBackground': "#2d313a",
+					'editorSuggestWidget.highlightForeground': "#18A0FB",
+					'textCodeBlock.background': '#0f0f0f',
+					'textCodeBlock.selectedBorder': '#0f0f0f',
+				}
+			});
+
+			require(['vs/basic-languages/monaco.contribution'], function () {
+				monaco.languages.registerCompletionItemProvider('lua', {
+					provideCompletionItems: function (model, position) {
+						return {
+							suggestions: getDependencyProposals(),
+						};
+					},
+					triggerCharacters: ['.', ':', '"'],
+				});
+
+				editor = monaco.editor.create(document.getElementById('container'), {
+					value: '',
+					language: 'lua',
+					theme: "Zorara",
+					fontSize: "14px",
+					fontFamily: "cascadia mono",
+					folding: true,
+					dragAndDrop: false,
+					links: true,
+					minimap: {
+						enabled: true,
+					},
+					showFoldingControls: "always",
+					smoothScrolling: true,
+					stopRenderingLineAfter: 6500,
+					cursorBlinking: "smooth",
+					cursorSmoothCaretAnimation: true,
+					foldingHighlight: false,
+					fontLigatures: true,
+					formatOnPaste: true,
+					showDeprecated: true,
+					suggest: {
+						snippetsPreventQuickSuggestions: false,
+					},
+					padding: {
+						top: 10,
+					}
+				});
+
+				try {
+					if (CefSharp) {
+					editor.getModel().onDidChangeContent(function(e) {
+						if (!e.isFlush) {
+							CefSharp.PostMessage('keydown')
+						}
+					})
+					
+					CefSharp.PostMessage('init')
+					
+					setInterval(() => {
+						CefSharp.PostMessage('save_tabs')
+					}, 5000)
+				} } catch { }
+
+				editor.getModel().updateOptions({ insertSpaces: false })
+			});
+
+			window.onresize = function () {
+				editor.layout();
+			}
+
+			Cut = function() {
+				editor.focus();
+				document.execCommand('cut');
+			}
+
+			Copy = function() {
+				editor.focus();
+				document.execCommand('copy');
+			}
+
+			Paste = function() {
+				editor.focus();
+				document.execCommand('paste');
+			}
+
+			Undo = function() {
+				editor.focus();
+				document.execCommand('undo');
+			}
+
+			Redo = function() {
+				editor.focus();
+				document.execCommand('redo');
+			}
+
+			Delete = function() {
+				editor.focus();
+				document.execCommand('delete');
+			}
+
+			SelectAll = function() {
+				editor.focus();
+				document.execCommand('selectAll');
+			}
+
+			GetText = function () {
+				return String(editor.getValue());
+			}
+
+			SetText = function (x) {
+				try {
+					editor.setValue(JSON.parse(`${String(x)}`));
+				} catch (e) {
+					editor.setValue(String(x))
+				}
+			}
+
+			GetProposals = function () {
+				return Proposals;
+			}
+
+
+			OnDidChangeContent = function (callback) {
+				return editor.onDidChangeModelContent((event) => {
+					callback(editor.getValue());
+				});
+			}
+
+			OnDidChangeCursorPosition = function (callback) {
+				return editor.onDidChangeCursorPosition((event) => {
+					callback(event.position);
+				});
+			}
+
+			SetTheme = function (themeName) {
+				if (themeName == "Dark") {
+					monaco.editor.setTheme("net-theme-dark");
+				}
+				if (themeName == "Light") {
+					monaco.editor.setTheme("net-theme-light");
+				}
+			}
+
+			SwitchMinimap = function (flag) {
+				editor.updateOptions({
+					minimap: {
+						enabled: flag,
+					}
+				});
+			}
+
+			SwitchReadonly = function (flag) {
+				editor.updateOptions({
+					readOnly: flag,
+				});
+			}
+
+			SwitchRenderWhitespace = function (op) {
+				editor.updateOptions({
+					renderWhitespace: op,
+				});
+			}
+
+			SwitchLinks = function (flag) {
+				editor.updateOptions({
+					links: flag,
+				});
+			}
+
+			SwitchLineHeight = function (num) {
+				editor.updateOptions({
+					lineHeight: num,
+				});
+			}
+
+			SwitchFontSize = function (num) {
+				editor.updateOptions({
+					fontSize: num,
+				});
+			}
+
+			SwitchFolding = function (flag) {
+				editor.updateOptions({
+					folding: flag,
+				});
+			}
+
+			SwitchAutoIndent = function (flag) {
+				editor.updateOptions({
+					autoIndent: flag,
+				});
+			}
+
+			SwitchFontFamily = function (name) {
+				editor.updateOptions({
+					fontFamily: name,
+				});
+			}
+
+			SwitchFontLigatures = function (flag) {
+				editor.updateOptions({
+					fontLigatures: flag,
+				});
+			}
+
+			ShowErr = function (line, column, endline, endcolumn, errMessage) {
+				editor.revealPositionInCenter({ lineNumber: line, column: column });
+				editor.deltaDecorations([], [
+					{
+						range: new monaco.Range(line, column, endline, endcolumn),
+						options: {
+							inlineClassName: 'squiggly-error',
+							hoverMessage: {
+								value: errMessage,
+							}
+						},
+					},
+				]);
+			}
+
+			AddSnippet = function (kindName, snippetName, data) {
+				let snippet = {
+					insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+					kind: monaco.languages.CompletionItemKind[kindName],
+				};
+				for (const key in data) {
+					let value = data[key];
+					if (key == "insertText" && typeof value == "object") {
+						value = value.join("\n");
+					};
+					snippet[key] = value;
+				}
+				if (!snippet.label) {
+					snippet.label = snippetName
+				}
+				if (!snippet.insertText) {
+					snippet.insertText = snippetName
+				}
+				Proposals.push(snippet);
+			}
+
+			AddRawSnippet = function (data) {
+				Proposals.push(data);
+			}
+
+			SetScroll = function (line) {
+				editor.revealLineInCenter({ lineNumber: line });
+			}
+
+			Refresh = function () {
+				var text = getText();
+				setText("");
+				editor.trigger('keyboard', 'type', { text: text });
+			}
+
+		});
+	</script>
+<script>
+	let tabs = [];
+	let currentTab = null;
+	let tabCounter = 1;
+	
+	class Tab {
+	  constructor(title, content = '', removable = true) {
+		this.id = 'tab-' + Math.random().toString(36).substr(2, 9);
+		this.title = title;
+		this.content = content;
+		this.element = null;
+		this.removable = removable;
+	  }
+	}
+	
+	function createTabElement(tab) {
+  const tabEl = document.createElement('div');
+  tabEl.className = 'tab';
+  tabEl.setAttribute('draggable', true);
+  tabEl.dataset.id = tab.id;
+
+  const titleSpan = document.createElement('span');
+  titleSpan.textContent = tab.title;
+  tabEl.appendChild(titleSpan);
+
+  tabEl.onclick = () => switchTab(tab.id);
+
+  tabEl.ondblclick = () => {
+    if (!tab.removable) return;
+
+    const oldName = tab.title;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = oldName;
+    input.className = 'tab-rename-input';
+
+    function finishRename() {
+      const newName = input.value.trim() || oldName;
+      tab.title = newName;
+	  function renameHandler() {
+  if (!tab.removable) return;
+
+  const titleSpan = tabEl.querySelector('span');
+  const oldName = tab.title;
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = oldName;
+  input.className = 'tab-rename-input';
+
+  function finishRename() {
+    const newName = input.value.trim() || oldName;
+    tab.title = newName;
+
+    const newSpan = document.createElement('span');
+    newSpan.textContent = newName;
+    tabEl.replaceChild(newSpan, input);
+    tabEl.ondblclick = renameHandler;
+  }
+
+  input.addEventListener('blur', finishRename);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') finishRename();
+  });
+
+  tabEl.replaceChild(input, titleSpan);
+  input.focus();
+  input.select();
+}
+tabEl.ondblclick = renameHandler;
+      const newSpan = document.createElement('span');
+newSpan.textContent = newName;
+tabEl.replaceChild(newSpan, input);
+tabEl.ondblclick = renameHandler;
+    }
+
+    input.addEventListener('blur', finishRename);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') finishRename();
+    });
+
+    tabEl.replaceChild(input, titleSpan);
+    input.focus();
+    input.select();
+  };
+
+  if (tab.removable) {
+    const closeEl = document.createElement('div');
+    closeEl.className = 'tab-close';
+    closeEl.textContent = '✕';
+    closeEl.onclick = (e) => {
+      e.stopPropagation();
+      removeTab(tab.id);
+    };
+    tabEl.appendChild(closeEl);
+  }
+
+  return tabEl;
+}
+
+	
+	function addTab(title, content = '', removable = true) {
+	  const tab = new Tab(title, content, removable);
+	  tabs.push(tab);
+	
+	  const tabEl = createTabElement(tab);
+	  tab.element = tabEl;
+	  tabEl.dataset.id = tab.id;
+	  const tabsContainer = document.getElementById('tabs-container');
+	  tabsContainer.insertBefore(tabEl, document.getElementById('new-tab-btn'));
+	
+	  switchTab(tab.id);
+	}
+	
+	function switchTab(id) {
+	  const tab = tabs.find(t => t.id === id);
+	  if (!tab) return;
+	
+	  if (currentTab) {
+		const current = tabs.find(t => t.id === currentTab);
+		if (current) {
+		  current.content = editor.getValue();
+		  current.element.classList.remove('active');
+		}
+	  }
+	
+	  tab.element.classList.add('active');
+	  editor.setValue(tab.content);
+	  currentTab = id;
+	}
+	
+	function removeTab(id) {
+	  const i = tabs.findIndex(t => t.id === id);
+	  if (i === -1 || !tabs[i].removable) return;
+	  const tab = tabs[i];
+	
+	  tab.element.remove();
+	  tabs.splice(i, 1);
+	
+	  if (currentTab === id && tabs.length) {
+		switchTab(tabs[0].id);
+	  }
+	}
+	document.getElementById('tabs-container').addEventListener('dragstart', function (e) {
+  if (!e.target.classList.contains('tab')) return;
+  e.dataTransfer.setData('text/plain', e.target.dataset.id);
+});
+
+document.getElementById('tabs-container').addEventListener('dragover', function (e) {
+  e.preventDefault();
+  const afterElement = getDragAfterElement(e.clientX);
+  const draggingId = e.dataTransfer.getData('text/plain');
+  const draggingTab = tabs.find(t => t.id === draggingId);
+  if (!draggingTab) return;
+
+  const container = document.getElementById('tabs-container');
+  const draggingEl = draggingTab.element;
+  const newIndex = afterElement ? Array.from(container.children).indexOf(afterElement) : container.children.length - 1;
+
+  if (container.contains(draggingEl)) {
+    container.removeChild(draggingEl);
+  }
+  container.insertBefore(draggingEl, afterElement);
+});
+
+function getDragAfterElement(x) {
+  const container = document.getElementById('tabs-container');
+  const draggableElements = [...container.querySelectorAll('.tab:not(.new-tab)')];
+
+  return draggableElements.reduce((closest, child) => {
+    const box = child.getBoundingClientRect();
+    const offset = x - box.left - box.width / 2;
+    if (offset < 0 && offset > closest.offset) {
+      return { offset: offset, element: child };
+    } else {
+      return closest;
+    }
+  }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+	document.getElementById('new-tab-btn').onclick = () => {
+	  addTab(`Tab ${tabCounter++}`, '');
+	};
+	
+	window.addEventListener('load', () => {
+	  addTab('Main', '--welcome to the Xora executor', false);
+	});
+	</script>
+		
+</body>
+
+</html>
